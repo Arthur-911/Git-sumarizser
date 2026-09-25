@@ -11,6 +11,7 @@ import {
   Share2,
 } from "lucide-react";
 import { TwitterIcon } from "./Icons";
+import { TiltCard } from "./TiltCard";
 
 interface ProfileCardProps {
   user: GitHubUser;
@@ -24,16 +25,21 @@ export function ProfileCard({ user, onOpenShare }: ProfileCardProps) {
   });
 
   return (
-    <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-6 sm:p-8 backdrop-blur-xl shadow-xl shadow-black/20">
+    <TiltCard maxTilt={3.5} className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-6 sm:p-8 backdrop-blur-xl shadow-xl shadow-black/20">
       <div className="flex flex-col sm:flex-row items-start gap-6">
-        {/* Avatar */}
-        <div className="relative group">
-          <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 opacity-70 blur-sm group-hover:opacity-100 transition duration-300"></div>
+        {/* Avatar with Rotating Cosmic Aura Glow */}
+        <div className="relative group shrink-0">
+          {/* Outer Rotating Conic Aura */}
+          <div className="absolute -inset-2 rounded-full bg-[conic-gradient(from_0deg,#06b6d4,#3b82f6,#8b5cf6,#22d3ee,#06b6d4)] blur-md opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 animate-spin-slow animate-aura-pulse" />
+
+          {/* Inner Accent Ring */}
+          <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-cyan-400 to-blue-500 opacity-80 group-hover:opacity-100 transition duration-300" />
+
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={user.avatar_url}
             alt={`${user.login}'s avatar`}
-            className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-full border-2 border-zinc-900 object-cover"
+            className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-full border-2 border-zinc-950 object-cover shadow-xl"
           />
         </div>
 
@@ -146,6 +152,6 @@ export function ProfileCard({ user, onOpenShare }: ProfileCardProps) {
           </div>
         </div>
       </div>
-    </div>
+    </TiltCard>
   );
 }

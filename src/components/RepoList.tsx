@@ -14,14 +14,40 @@ import {
   Calendar,
   AlertCircle,
 } from "lucide-react";
+import { TiltCard } from "./TiltCard";
+
+function SparkleBurst() {
+  const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+  return (
+    <span className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
+      {angles.map((deg, i) => {
+        const rad = (deg * Math.PI) / 180;
+        const tx = Math.cos(rad) * 16;
+        const ty = Math.sin(rad) * 16;
+        return (
+          <span
+            key={i}
+            style={{
+              "--tx": `${tx}px`,
+              "--ty": `${ty}px`,
+            } as React.CSSProperties}
+            className="absolute h-1 w-1 rounded-full bg-cyan-300 animate-sparkle-burst"
+          />
+        );
+      })}
+    </span>
+  );
+}
 
 interface RepoListProps {
   repos: GitHubRepo[];
+  selectedLanguage?: string | null;
+  onClearLanguage?: () => void;
 }
 
 type SortOption = "stars" | "forks" | "updated" | "name";
 
-export function RepoList({ repos }: RepoListProps) {
+export function RepoList({ repos, selectedLanguage, onClearLanguage }: RepoListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("stars");
   const [hideForks, setHideForks] = useState(false);
@@ -31,6 +57,9 @@ export function RepoList({ repos }: RepoListProps) {
     return repos
       .filter((repo) => {
         if (hideForks && repo.fork) return false;
+        if (selectedLanguage && repo.language?.toLowerCase() !== selectedLanguage.toLowerCase()) {
+          return false;
+        }
         if (!searchTerm) return true;
         const term = searchTerm.toLowerCase();
         return (
@@ -48,7 +77,7 @@ export function RepoList({ repos }: RepoListProps) {
         if (sortBy === "name") return a.name.localeCompare(b.name);
         return 0;
       });
-  }, [repos, searchTerm, sortBy, hideForks]);
+  }, [repos, searchTerm, sortBy, hideForks, selectedLanguage]);
 
   const handleCopyClone = (repo: GitHubRepo) => {
     const cloneUrl = `git clone ${repo.html_url}.git`;
@@ -112,16 +141,47 @@ export function RepoList({ repos }: RepoListProps) {
         </div>
       </div>
 
+      {/* Active Language Filter Banner */}
+      {selectedLanguage && (
+        <div className="flex items-center justify-between rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-2.5 text-xs text-cyan-300 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="text-zinc-400">Filtering repositories by:</span>
+            <span className="rounded-md bg-cyan-500/20 px-2 py-0.5 font-mono font-semibold text-cyan-200">
+              {selectedLanguage}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onClearLanguage}
+            className="rounded-lg bg-cyan-500/20 px-2.5 py-1 text-[11px] font-medium text-cyan-200 hover:bg-cyan-500/30 hover:text-white transition"
+          >
+            Show All Languages ✕
+          </button>
+        </div>
+      )}
+
       {/* Grid of Repository Cards */}
       {filteredAndSortedRepos.length === 0 ? (
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-12 text-center space-y-3">
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-12 text-center space-y-3 animate-fade-in">
           <AlertCircle className="h-8 w-8 text-zinc-500 mx-auto" />
           <p className="text-zinc-300 font-medium">No repositories match your criteria.</p>
           <p className="text-zinc-500 text-xs">Try adjusting your search keywords or filters.</p>
+          {selectedLanguage && (
+            <button
+              type="button"
+              onClick={onClearLanguage}
+              className="mt-2 inline-flex text-xs font-semibold text-cyan-400 hover:underline"
+            >
+              Clear language filter ({selectedLanguage})
+            </button>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredAndSortedRepos.map((repo) => {
+        <div
+          key={`${searchTerm}-${sortBy}-${hideForks}-${selectedLanguage || "all"}`}
+          className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in"
+        >
+          {filteredAndSortedRepos.map((repo, index) => {
             const updatedDate = new Date(repo.pushed_at).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
@@ -129,9 +189,11 @@ export function RepoList({ repos }: RepoListProps) {
             });
 
             return (
-              <div
+              <TiltCard
                 key={repo.id}
-                className="group flex flex-col justify-between rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-5 backdrop-blur-xl transition hover:border-zinc-700 hover:bg-zinc-900/70 shadow-lg shadow-black/20"
+                maxTilt={3}
+                style={{ animationDelay: `${Math.min(index, 8) * 65}ms` }}
+                className="animate-cascade-up group flex flex-col justify-between rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-5 backdrop-blur-xl transition hover:border-zinc-700 hover:bg-zinc-900/70 shadow-lg shadow-black/20"
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-2">
@@ -200,12 +262,13 @@ export function RepoList({ repos }: RepoListProps) {
                       type="button"
                       onClick={() => handleCopyClone(repo)}
                       title="Copy git clone command"
-                      className="inline-flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2 py-1 text-[11px] text-zinc-400 hover:text-white hover:border-zinc-700 transition"
+                      className="relative inline-flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950/60 px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white hover:border-zinc-700 transition"
                     >
+                      {copiedRepoId === repo.id && <SparkleBurst />}
                       {copiedRepoId === repo.id ? (
                         <>
-                          <Check className="h-3 w-3 text-emerald-400" />
-                          <span className="text-emerald-400">Copied</span>
+                          <Check className="h-3 w-3 text-emerald-400 animate-fade-in" />
+                          <span className="text-emerald-400 animate-fade-in">Copied</span>
                         </>
                       ) : (
                         <>
@@ -221,7 +284,7 @@ export function RepoList({ repos }: RepoListProps) {
                     </div>
                   </div>
                 </div>
-              </div>
+              </TiltCard>
             );
           })}
         </div>

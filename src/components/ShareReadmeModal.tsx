@@ -4,6 +4,29 @@ import { useState } from "react";
 import { GitHubUser, UserStats } from "@/types/github";
 import { Copy, Check, X, FileText } from "lucide-react";
 
+function SparkleBurst() {
+  const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+  return (
+    <span className="pointer-events-none absolute inset-0 flex items-center justify-center z-30">
+      {angles.map((deg, i) => {
+        const rad = (deg * Math.PI) / 180;
+        const tx = Math.cos(rad) * 20;
+        const ty = Math.sin(rad) * 20;
+        return (
+          <span
+            key={i}
+            style={{
+              "--tx": `${tx}px`,
+              "--ty": `${ty}px`,
+            } as React.CSSProperties}
+            className="absolute h-1.5 w-1.5 rounded-full bg-cyan-200 animate-sparkle-burst"
+          />
+        );
+      })}
+    </span>
+  );
+}
+
 interface ShareReadmeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -34,8 +57,8 @@ ${user.location ? `- 📍 **Location:** ${user.location}\n` : ""}${user.blog ? `
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="relative w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl space-y-4 animate-fade-in">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-cyan-400" />
@@ -68,8 +91,9 @@ ${user.location ? `- 📍 **Location:** ${user.location}\n` : ""}${user.blog ? `
           <button
             type="button"
             onClick={handleCopy}
-            className="inline-flex items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-cyan-400 transition shadow-md shadow-cyan-500/20"
+            className="relative inline-flex items-center gap-2 rounded-xl bg-cyan-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-cyan-400 transition shadow-md shadow-cyan-500/20"
           >
+            {copied && <SparkleBurst />}
             {copied ? (
               <>
                 <Check className="h-4 w-4" />
