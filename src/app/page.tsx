@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { SearchSection } from "@/components/SearchSection";
@@ -22,27 +22,64 @@ function GitPulseContent() {
   const [error, setError] = useState<string | null>(null);
   const [isShareOpen, setIsShareOpen] = useState(false);
 
+  const lastFetchedUserRef = useRef<string>("");
+  const cacheRef = useRef<Map<string, { user: GitHubUser; repos: GitHubRepo[]; stats: UserStats }>>(new Map());
+
   const handleSearch = useCallback(async (username: string) => {
+    const cleanUsername = username.trim().toLowerCase();
+    if (!cleanUsername) return;
+
+    // Avoid duplicate requests if already showing this user
+    if (lastFetchedUserRef.current === cleanUsername) {
+      return;
+    }
+
+    // Check in-memory cache first
+    const cached = cacheRef.current.get(cleanUsername);
+    if (cached) {
+      lastFetchedUserRef.current = cleanUsername;
+      setUser(cached.user);
+      setRepos(cached.repos);
+      setStats(cached.stats);
+      setError(null);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("username") !== cleanUsername) {
+          url.searchParams.set("username", cleanUsername);
+          window.history.replaceState({}, "", url.toString());
+        }
+      }
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
       const [userData, reposData] = await Promise.all([
-        fetchGitHubUser(username),
-        fetchUserRepos(username),
+        fetchGitHubUser(cleanUsername),
+        fetchUserRepos(cleanUsername),
       ]);
 
       const computedStats = computeUserStats(reposData);
 
+      cacheRef.current.set(cleanUsername, {
+        user: userData,
+        repos: reposData,
+        stats: computedStats,
+      });
+
+      lastFetchedUserRef.current = cleanUsername;
       setUser(userData);
       setRepos(reposData);
       setStats(computedStats);
 
-      // Update browser URL without full reload
       if (typeof window !== "undefined") {
         const url = new URL(window.location.href);
-        url.searchParams.set("username", username);
-        window.history.pushState({}, "", url.toString());
+        if (url.searchParams.get("username") !== cleanUsername) {
+          url.searchParams.set("username", cleanUsername);
+          window.history.replaceState({}, "", url.toString());
+        }
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -60,7 +97,9 @@ function GitPulseContent() {
 
   useEffect(() => {
     const initialUser = searchParams?.get("username") || "shadcn";
-    handleSearch(initialUser);
+    if (lastFetchedUserRef.current !== initialUser.trim().toLowerCase()) {
+      handleSearch(initialUser);
+    }
   }, [searchParams, handleSearch]);
 
   return (

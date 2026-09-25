@@ -49,7 +49,7 @@ export function SearchSection({ onSearch, isLoading }: SearchSectionProps) {
           <button
             type="submit"
             disabled={isLoading || !inputUsername.trim()}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-cyan-500 px-5 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md shadow-cyan-500/20"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-xl bg-cyan-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[105px] gap-2 shadow-md shadow-cyan-500/20"
           >
             {isLoading ? (
               <>
