@@ -2,29 +2,21 @@
 
 import React, { useRef, useEffect, useCallback } from "react";
 import { LanguageStat } from "@/types/github";
+import {
+  WavePoint,
+  Bubble,
+  initPoints,
+  initBubbles,
+  updateSprings,
+  applyMouseImpulse,
+  findLanguageAtPercent,
+} from "./language/liquidPhysics";
 
 interface LiquidLanguageBarProps {
   languages: LanguageStat[];
   selectedLanguage?: string | null;
   onSelectLanguage?: (lang: string | null) => void;
   onHoverLanguage?: (lang: LanguageStat | null, posPercent: number | null) => void;
-}
-
-interface WavePoint {
-  x: number;
-  y: number;
-  targetY: number;
-  vy: number;
-}
-
-interface Bubble {
-  x: number;
-  yRatio: number;
-  radius: number;
-  speed: number;
-  wobbleSpeed: number;
-  wobbleAmp: number;
-  phase: number;
 }
 
 export function LiquidLanguageBar({
@@ -36,50 +28,25 @@ export function LiquidLanguageBar({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Physics simulation references
   const animFrameId = useRef<number | null>(null);
   const pointsRef = useRef<WavePoint[]>([]);
   const bubblesRef = useRef<Bubble[]>([]);
   const lastMousePos = useRef<{ x: number; y: number; time: number } | null>(null);
-  const isHoveredRef = useRef(false);
 
   const numPoints = 100;
-  const restingY = 7; // Distance from top for resting surface level
+  const restingY = 7;
 
-  // Initialize bubbles
   useEffect(() => {
-    const bubbles: Bubble[] = [];
-    const count = 16;
-    for (let i = 0; i < count; i++) {
-      bubbles.push({
-        x: Math.random(),
-        yRatio: 0.35 + Math.random() * 0.55,
-        radius: 1 + Math.random() * 2,
-        speed: 0.0008 + Math.random() * 0.0016,
-        wobbleSpeed: 1.5 + Math.random() * 2.5,
-        wobbleAmp: 0.004 + Math.random() * 0.006,
-        phase: Math.random() * Math.PI * 2,
-      });
-    }
-    bubblesRef.current = bubbles;
+    bubblesRef.current = initBubbles(16);
   }, []);
 
-  // Initialize wave points
-  const initPoints = useCallback((width: number) => {
-    const pts: WavePoint[] = [];
-    for (let i = 0; i < numPoints; i++) {
-      const x = (i / (numPoints - 1)) * width;
-      pts.push({
-        x,
-        y: restingY,
-        targetY: restingY,
-        vy: 0,
-      });
-    }
-    pointsRef.current = pts;
-  }, [restingY]);
+  const handleInitPoints = useCallback(
+    (width: number) => {
+      pointsRef.current = initPoints(width, numPoints, restingY);
+    },
+    [restingY]
+  );
 
-  // Main simulation and render loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -98,16 +65,11 @@ export function LiquidLanguageBar({
       canvas.height = height * dpr;
       ctx.resetTransform();
       ctx.scale(dpr, dpr);
-      initPoints(width);
+      handleInitPoints(width);
     };
 
     updateDimensions();
     window.addEventListener("resize", updateDimensions);
-
-    // Physics parameters - calm, silky ripple physics
-    const tension = 0.014;
-    const dampening = 0.055;
-    const spread = 0.12;
 
     let clock = 0;
 
@@ -115,49 +77,10 @@ export function LiquidLanguageBar({
       clock += 0.014;
       const pts = pointsRef.current;
 
-      if (pts.length === numPoints) {
-        // 1. Spring physics update with gentle organic breathing
-        for (let i = 0; i < pts.length; i++) {
-          const pt = pts[i];
-          pt.targetY = restingY + Math.sin(clock * 0.9 + (i / numPoints) * Math.PI * 2) * 0.18;
-          const force = -tension * (pt.y - pt.targetY) - dampening * pt.vy;
-          pt.vy += force;
+      updateSprings(pts, numPoints, restingY, clock);
 
-          // Clamp velocity to prevent runaway agitation
-          pt.vy = Math.max(-0.7, Math.min(0.7, pt.vy));
-          pt.y += pt.vy;
-
-          // Hard-clamp wave to a calm, gentle window of +/- 2.5px around resting surface
-          if (pt.y < restingY - 2.5) {
-            pt.y = restingY - 2.5;
-            pt.vy = 0;
-          } else if (pt.y > restingY + 2.5) {
-            pt.y = restingY + 2.5;
-            pt.vy = 0;
-          }
-        }
-
-        // 2. Neighbor wave propagation passes (smooth fluid glide)
-        for (let pass = 0; pass < 2; pass++) {
-          for (let i = 0; i < pts.length; i++) {
-            if (i > 0) {
-              const leftDelta = spread * (pts[i].y - pts[i - 1].y);
-              pts[i - 1].vy += leftDelta;
-              pts[i - 1].y += leftDelta;
-            }
-            if (i < pts.length - 1) {
-              const rightDelta = spread * (pts[i].y - pts[i + 1].y);
-              pts[i + 1].vy += rightDelta;
-              pts[i + 1].y += rightDelta;
-            }
-          }
-        }
-      }
-
-      // Clear canvas
       ctx.clearRect(0, 0, width, height);
 
-      // Total percentage accumulator for boundaries
       let cumulativePercent = 0;
       const boundaries: { lang: LanguageStat; xStart: number; xEnd: number }[] = [];
 
@@ -168,12 +91,11 @@ export function LiquidLanguageBar({
         boundaries.push({ lang, xStart: startX, xEnd: endX });
       });
 
-      // 3. Draw each liquid segment
+      // Draw liquid segments
       boundaries.forEach(({ lang, xStart, xEnd }) => {
         const isSelected = selectedLanguage === lang.name;
         const isDimmed = selectedLanguage && !isSelected;
 
-        // Find wave points in this segment's range
         const startIndex = Math.max(0, Math.floor((xStart / width) * (numPoints - 1)));
         const endIndex = Math.min(numPoints - 1, Math.ceil((xEnd / width) * (numPoints - 1)));
 
@@ -181,11 +103,9 @@ export function LiquidLanguageBar({
         ctx.beginPath();
         ctx.moveTo(xStart, height);
 
-        // First point at wave height
         const startY = pts[startIndex] ? pts[startIndex].y : restingY;
         ctx.lineTo(xStart, startY);
 
-        // Smooth curve along wave points
         for (let i = startIndex; i <= endIndex; i++) {
           const pt = pts[i];
           if (pt) {
@@ -198,7 +118,6 @@ export function LiquidLanguageBar({
         ctx.lineTo(xEnd, height);
         ctx.closePath();
 
-        // Fluid color gradient
         const fluidGrad = ctx.createLinearGradient(0, 0, 0, height);
         if (isDimmed) {
           fluidGrad.addColorStop(0, `${lang.color}33`);
@@ -216,7 +135,6 @@ export function LiquidLanguageBar({
         ctx.fillStyle = fluidGrad;
         ctx.fill();
 
-        // Selected neon aura
         if (isSelected) {
           ctx.strokeStyle = "#ffffff";
           ctx.lineWidth = 1.8;
@@ -227,7 +145,6 @@ export function LiquidLanguageBar({
 
         ctx.restore();
 
-        // Internal meniscus boundary line between liquids
         if (xEnd < width - 1) {
           ctx.save();
           ctx.strokeStyle = "rgba(255, 255, 255, 0.25)";
@@ -240,7 +157,7 @@ export function LiquidLanguageBar({
         }
       });
 
-      // 4. Draw continuous glowing surface meniscus wave line
+      // Surface meniscus wave
       ctx.save();
       ctx.beginPath();
       if (pts.length > 0) {
@@ -256,10 +173,9 @@ export function LiquidLanguageBar({
       ctx.stroke();
       ctx.restore();
 
-      // 5. Render floating micro-bubbles
+      // Render floating micro-bubbles
       const bubbles = bubblesRef.current;
       bubbles.forEach((b) => {
-        // Calm, gentle bobbing
         b.phase += b.wobbleSpeed * 0.012;
         const currentX = (b.x + Math.sin(b.phase) * b.wobbleAmp) * width;
         const currentY = b.yRatio * height + Math.cos(b.phase) * 1.2;
@@ -275,7 +191,7 @@ export function LiquidLanguageBar({
         ctx.restore();
       });
 
-      // 6. Draw internal typography for wide segments
+      // Typography for wide segments
       boundaries.forEach(({ lang, xStart, xEnd }) => {
         const segWidth = xEnd - xStart;
         if (segWidth >= 65) {
@@ -302,7 +218,6 @@ export function LiquidLanguageBar({
         }
       });
 
-      // Continue animation loop
       animFrameId.current = requestAnimationFrame(render);
     };
 
@@ -312,9 +227,8 @@ export function LiquidLanguageBar({
       if (animFrameId.current) cancelAnimationFrame(animFrameId.current);
       window.removeEventListener("resize", updateDimensions);
     };
-  }, [languages, selectedLanguage, initPoints, restingY]);
+  }, [languages, selectedLanguage, handleInitPoints, restingY]);
 
-  // Handle cursor hover and movement along the bar to induce waves
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -328,65 +242,23 @@ export function LiquidLanguageBar({
     const normalizedX = Math.max(0, Math.min(1, x / width));
     const percent = normalizedX * 100;
 
-    // Determine which language is under cursor
-    let accum = 0;
-    let hovered: LanguageStat | null = null;
-    for (const lang of languages) {
-      accum += lang.percentage;
-      if (percent <= accum || lang === languages[languages.length - 1]) {
-        hovered = lang;
-        break;
-      }
-    }
-
+    const hovered = findLanguageAtPercent(languages, percent);
     if (onHoverLanguage) {
       onHoverLanguage(hovered, percent);
     }
 
-    // Liquid wave physics impulse based on cursor movement
     if (lastMousePos.current) {
       const dt = Math.max(10, currentTime - lastMousePos.current.time);
       const dx = x - lastMousePos.current.x;
       const speed = Math.min(Math.abs(dx) / dt, 2.0);
 
-      // Map cursor X to wave point index
-      const targetIndex = Math.floor(normalizedX * (numPoints - 1));
-      const pts = pointsRef.current;
-
-      if (pts && pts.length === numPoints) {
-        // Calibrated gentle ripple impulse (0.35 to 0.70 max)
-        const impulse = 0.35 + speed * 0.18;
-        const direction = dx >= 0 ? 1 : -1;
-        const splashRadius = 8;
-
-        for (let i = -splashRadius; i <= splashRadius; i++) {
-          const idx = targetIndex + i;
-          if (idx >= 0 && idx < numPoints) {
-            const dist = Math.abs(i) / splashRadius;
-            const factor = Math.cos(dist * (Math.PI / 2));
-
-            // Soft fluid displacement (gentle dip & crest)
-            if (i === 0) {
-              pts[idx].vy += impulse * 0.35;
-            } else if ((direction > 0 && i > 0) || (direction < 0 && i < 0)) {
-              pts[idx].vy -= impulse * factor * 0.30;
-            } else {
-              pts[idx].vy += impulse * factor * 0.12;
-            }
-          }
-        }
-      }
+      applyMouseImpulse(pointsRef.current, numPoints, normalizedX, dx, speed);
     }
 
     lastMousePos.current = { x, y, time: currentTime };
   };
 
-  const handleMouseEnter = () => {
-    isHoveredRef.current = true;
-  };
-
   const handleMouseLeave = () => {
-    isHoveredRef.current = false;
     lastMousePos.current = null;
     if (onHoverLanguage) {
       onHoverLanguage(null, null);
@@ -402,16 +274,12 @@ export function LiquidLanguageBar({
     const normalizedX = Math.max(0, Math.min(1, x / rect.width));
     const percent = normalizedX * 100;
 
-    let accum = 0;
-    for (const lang of languages) {
-      accum += lang.percentage;
-      if (percent <= accum || lang === languages[languages.length - 1]) {
-        if (selectedLanguage === lang.name) {
-          onSelectLanguage(null);
-        } else {
-          onSelectLanguage(lang.name);
-        }
-        break;
+    const clickedLang = findLanguageAtPercent(languages, percent);
+    if (clickedLang) {
+      if (selectedLanguage === clickedLang.name) {
+        onSelectLanguage(null);
+      } else {
+        onSelectLanguage(clickedLang.name);
       }
     }
   };
@@ -420,22 +288,15 @@ export function LiquidLanguageBar({
     <div
       ref={containerRef}
       onMouseMove={handleMouseMove}
-      onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
       className="group relative h-9 w-full rounded-2xl bg-zinc-950/90 border border-zinc-700/80 p-1 shadow-[inset_0_3px_10px_rgba(0,0,0,0.9),0_2px_12px_rgba(0,0,0,0.5)] cursor-pointer select-none overflow-hidden transition-all duration-300 hover:border-zinc-500/80 hover:shadow-[0_0_24px_rgba(6,182,212,0.2),inset_0_3px_10px_rgba(0,0,0,0.9)]"
     >
-      {/* Curved Glass Specular Highlight (Top Half of Tube) */}
       <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/30 via-white/10 to-transparent pointer-events-none rounded-t-2xl z-20" />
-
-      {/* Bottom Caustic Reflection */}
       <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-white/10 to-transparent pointer-events-none rounded-b-2xl z-20" />
-
-      {/* Glass Tube Endcaps Vignette */}
       <div className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-black/40 to-transparent pointer-events-none z-20" />
       <div className="absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-black/40 to-transparent pointer-events-none z-20" />
 
-      {/* The Dynamic Liquid Canvas */}
       <canvas
         ref={canvasRef}
         className="w-full h-full block rounded-xl relative z-10"

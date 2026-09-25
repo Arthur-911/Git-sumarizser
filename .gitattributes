@@ -1,0 +1,3 @@
+# GitHub Linguist & Diff rules for a clean repository
+package-lock.json linguist-generated=true -diff
+*.tsbuildinfo linguist-generated=true -diff

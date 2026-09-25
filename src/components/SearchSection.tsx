@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useSyncExternalStore, useMemo } from "react";
-import { Search, Loader2, Dices } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
+import { SurpriseMeControl } from "./search/SurpriseMeControl";
+import { RecentSearches } from "./search/RecentSearches";
 
 interface SearchSectionProps {
   onSearch: (username: string) => void;
@@ -9,24 +11,6 @@ interface SearchSectionProps {
 }
 
 const PRESET_USERS = ["shadcn", "torvalds", "leerob", "gaearon", "vercel"];
-
-const SURPRISE_USERS = [
-  "antfu",
-  "yyx990803",
-  "rich-harris",
-  "sindresorhus",
-  "tj",
-  "gaearon",
-  "shadcn",
-  "torvalds",
-  "leerob",
-  "addyosmani",
-  "sdras",
-  "kentcdodds",
-  "wesbos",
-  "t3dotgg",
-  "catppuccin",
-];
 
 const ROTATING_ROLES = [
   "GitHub Developer",
@@ -97,13 +81,10 @@ export function SearchSection({ onSearch, isLoading }: SearchSectionProps) {
     }
   };
 
-  const handleSurpriseMe = () => {
-    const current = inputUsername.trim().toLowerCase();
-    const pool = SURPRISE_USERS.filter((u) => u.toLowerCase() !== current);
-    const randomUser = pool[Math.floor(Math.random() * pool.length)] || SURPRISE_USERS[0];
-    setInputUsername(randomUser);
-    saveRecentSearch(randomUser);
-    onSearch(randomUser);
+  const handleTriggerSearch = (username: string) => {
+    setInputUsername(username);
+    saveRecentSearch(username);
+    onSearch(username);
   };
 
   useEffect(() => {
@@ -130,15 +111,8 @@ export function SearchSection({ onSearch, isLoading }: SearchSectionProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputUsername.trim()) {
-      saveRecentSearch(inputUsername.trim());
-      onSearch(inputUsername.trim());
+      handleTriggerSearch(inputUsername.trim());
     }
-  };
-
-  const handlePresetClick = (preset: string) => {
-    setInputUsername(preset);
-    saveRecentSearch(preset);
-    onSearch(preset);
   };
 
   return (
@@ -158,25 +132,29 @@ export function SearchSection({ onSearch, isLoading }: SearchSectionProps) {
           <span className="inline-block relative">
             <span
               key={`${roleIndex}-${roleAnim}`}
-              className={`inline-block bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-500 bg-clip-text text-transparent pb-1 ${
+              className={`inline-block bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-500 bg-clip-text text-transparent transition-all duration-300 ${
                 roleAnim === "disappearing"
-                  ? "animate-word-disappear"
+                  ? "animate-role-exit"
                   : roleAnim === "reappearing"
-                  ? "animate-word-reappear"
-                  : ""
+                  ? "animate-role-enter"
+                  : "animate-role-idle"
               }`}
             >
               {ROTATING_ROLES[roleIndex]}
             </span>
           </span>
         </h1>
-        <p className="text-zinc-400 text-sm sm:text-base max-w-xl mx-auto">
-          Instant deep analytics on repositories, star distribution, language usage, and activity statistics.
+        <p className="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto">
+          Deep-dive into GitHub developers and repositories. Analyze tech stacks, track community stars, and generate profile markdown in seconds.
         </p>
       </div>
 
-      <div className="space-y-3 max-w-xl mx-auto">
-        <form onSubmit={handleSubmit} className="relative flex items-center w-full group">
+      {/* Search Input Box with Luminous Hover Glow */}
+      <div className="space-y-4">
+        <form onSubmit={handleSubmit} className="relative max-w-xl mx-auto group">
+          {/* Subtle Ambient Behind-Glow */}
+          <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-indigo-500/20 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition duration-500 blur-xl pointer-events-none" />
+
           {/* Luminous Animated Border Beam */}
           <div className="absolute -inset-[1.5px] rounded-2xl bg-[conic-gradient(from_0deg_at_50%_50%,transparent_0deg,transparent_270deg,#06b6d4_320deg,#38bdf8_360deg)] opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 animate-spin-slow transition-opacity duration-500 blur-[2px] pointer-events-none" />
 
@@ -206,57 +184,21 @@ export function SearchSection({ onSearch, isLoading }: SearchSectionProps) {
           </div>
         </form>
 
-        <div className="flex items-center justify-center">
-          <button
-            type="button"
-            onClick={handleSurpriseMe}
-            disabled={isLoading}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-1.5 text-xs font-medium text-cyan-400 hover:border-cyan-500/50 hover:bg-zinc-800 hover:text-cyan-300 transition shadow-sm"
-          >
-            <Dices className="h-3.5 w-3.5 text-cyan-400" />
-            <span>🎲 Surprise Me (Random Creator)</span>
-          </button>
-        </div>
+        {/* Surprise Me Control (Full Random & Tier Selector) */}
+        <SurpriseMeControl
+          isLoading={isLoading}
+          currentUsername={inputUsername}
+          onSelectUser={handleTriggerSearch}
+        />
       </div>
 
-      <div className="space-y-2">
-        {recentSearches.length > 0 && (
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-400">
-            <span className="text-zinc-500 font-medium">Recent:</span>
-            {recentSearches.map((user) => (
-              <button
-                key={user}
-                type="button"
-                onClick={() => handlePresetClick(user)}
-                className="rounded-full border border-cyan-500/30 bg-cyan-950/30 px-3 py-1 font-mono text-cyan-300 transition hover:border-cyan-500 hover:bg-cyan-900/50 hover:text-white"
-              >
-                @{user}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={handleClearHistory}
-              className="text-[11px] text-zinc-500 hover:text-zinc-300 underline ml-1"
-            >
-              clear
-            </button>
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-400">
-          <span className="text-zinc-500 font-medium">Quick inspect:</span>
-          {PRESET_USERS.map((user) => (
-            <button
-              key={user}
-              type="button"
-              onClick={() => handlePresetClick(user)}
-              className="rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1 font-mono text-zinc-300 transition hover:border-cyan-500/50 hover:bg-zinc-800 hover:text-cyan-400"
-            >
-              @{user}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Recent Searches and Quick Inspect Presets */}
+      <RecentSearches
+        recentSearches={recentSearches}
+        presets={PRESET_USERS}
+        onSelectUser={handleTriggerSearch}
+        onClearHistory={handleClearHistory}
+      />
     </section>
   );
 }
