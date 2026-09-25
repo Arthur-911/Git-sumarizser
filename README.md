@@ -61,8 +61,8 @@ Make sure you have [Node.js](https://nodejs.org/) (v18.17+ or LTS) installed on 
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/gitpulse.git
-cd gitpulse
+git clone https://github.com/Arthur-911/Git-sumarizser.git
+cd Git-sumarizser
 ```
 
 ### 2. Install dependencies
