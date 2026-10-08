@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useSyncExternalStore, useMemo } from "react";
 import { Search, Loader2 } from "lucide-react";
+import { isValidGitHubUsername } from "@/lib/github";
 import { SurpriseMeControl } from "./search/SurpriseMeControl";
 import { RecentSearches } from "./search/RecentSearches";
 
@@ -53,7 +54,11 @@ export function SearchSection({ onSearch, isLoading }: SearchSectionProps) {
   const recentSearches = useMemo(() => {
     try {
       const parsed = JSON.parse(recentStorageRaw);
-      return Array.isArray(parsed) ? (parsed.slice(0, 5) as string[]) : [];
+      return Array.isArray(parsed)
+        ? (parsed
+            .filter((item): item is string => typeof item === "string" && isValidGitHubUsername(item))
+            .slice(0, 5))
+        : [];
     } catch {
       return [];
     }
@@ -62,7 +67,7 @@ export function SearchSection({ onSearch, isLoading }: SearchSectionProps) {
   const saveRecentSearch = (user: string) => {
     try {
       const clean = user.trim().toLowerCase();
-      if (!clean) return;
+      if (!clean || !isValidGitHubUsername(clean)) return;
       const current = recentSearches.filter((u) => u.toLowerCase() !== clean);
       const updated = [clean, ...current].slice(0, 5);
       localStorage.setItem("gitpulse_recent_users", JSON.stringify(updated));

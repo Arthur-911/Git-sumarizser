@@ -28,9 +28,23 @@ export function getLanguageColor(language: string | null): string {
   return LANGUAGE_COLORS[language] || "#58a6ff";
 }
 
+const GITHUB_USERNAME_REGEX = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
+
+export function isValidGitHubUsername(username: string): boolean {
+  return GITHUB_USERNAME_REGEX.test(username.trim());
+}
+
 export async function fetchGitHubUser(username: string): Promise<GitHubUser> {
   const cleanUsername = username.trim();
-  const response = await fetch(`https://api.github.com/users/${cleanUsername}`, {
+  if (!cleanUsername) {
+    throw new Error("Username cannot be empty.");
+  }
+  if (!isValidGitHubUsername(cleanUsername)) {
+    throw new Error(`"${cleanUsername}" is not a valid GitHub username format.`);
+  }
+
+  const encodedUsername = encodeURIComponent(cleanUsername);
+  const response = await fetch(`https://api.github.com/users/${encodedUsername}`, {
     headers: {
       Accept: "application/vnd.github.v3+json",
     },
@@ -51,9 +65,17 @@ export async function fetchGitHubUser(username: string): Promise<GitHubUser> {
 
 export async function fetchUserRepos(username: string): Promise<GitHubRepo[]> {
   const cleanUsername = username.trim();
+  if (!cleanUsername) {
+    throw new Error("Username cannot be empty.");
+  }
+  if (!isValidGitHubUsername(cleanUsername)) {
+    throw new Error(`"${cleanUsername}" is not a valid GitHub username format.`);
+  }
+
+  const encodedUsername = encodeURIComponent(cleanUsername);
   // Fetch up to 100 repositories sorted by pushed date
   const response = await fetch(
-    `https://api.github.com/users/${cleanUsername}/repos?per_page=100&sort=pushed`,
+    `https://api.github.com/users/${encodedUsername}/repos?per_page=100&sort=pushed`,
     {
       headers: {
         Accept: "application/vnd.github.v3+json",

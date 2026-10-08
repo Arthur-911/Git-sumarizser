@@ -12,7 +12,7 @@ import { ShareReadmeModal } from "@/components/ShareReadmeModal";
 import { ProfileSkeleton } from "@/components/ProfileSkeleton";
 import { CosmicBackground } from "@/components/CosmicBackground";
 import { GitHubRepo, GitHubUser, UserStats } from "@/types/github";
-import { computeUserStats, fetchGitHubUser, fetchUserRepos } from "@/lib/github";
+import { computeUserStats, fetchGitHubUser, fetchUserRepos, isValidGitHubUsername } from "@/lib/github";
 import { AlertTriangle, Heart } from "lucide-react";
 
 function GitPulseContent() {
@@ -35,6 +35,12 @@ function GitPulseContent() {
   const handleSearch = useCallback(async (username: string) => {
     const cleanUsername = username.trim().toLowerCase();
     if (!cleanUsername) return;
+
+    if (!isValidGitHubUsername(cleanUsername)) {
+      setError(`"${cleanUsername}" is not a valid GitHub username.`);
+      setIsLoading(false);
+      return;
+    }
 
     // Avoid duplicate requests if already showing this user
     if (lastFetchedUserRef.current === cleanUsername && currentUserRef.current !== null) {
@@ -141,7 +147,8 @@ function GitPulseContent() {
   }, []);
 
   useEffect(() => {
-    const initialUser = searchParams?.get("username") || "shadcn";
+    const rawUser = searchParams?.get("username") || "shadcn";
+    const initialUser = isValidGitHubUsername(rawUser) ? rawUser : "shadcn";
     if (lastFetchedUserRef.current !== initialUser.trim().toLowerCase()) {
       handleSearch(initialUser);
     }

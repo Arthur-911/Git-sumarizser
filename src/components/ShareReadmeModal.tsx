@@ -34,21 +34,53 @@ interface ShareReadmeModalProps {
   stats: UserStats;
 }
 
+function escapeMarkdownText(text: string): string {
+  // Strip raw HTML tags and escape markdown link/bracket delimiters
+  return text
+    .replace(/<[^>]*>/g, "")
+    .replace(/[\[\]]/g, "")
+    .trim();
+}
+
+function getSafeMarkdownUrl(rawUrl: string): string | null {
+  try {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return null;
+    const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const parsed = new URL(withProtocol);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.href;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function ShareReadmeModal({ isOpen, onClose, user, stats }: ShareReadmeModalProps) {
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
-  const markdownContent = `### Hi there, I'm ${user.name || user.login}! 👋
+  const displayName = escapeMarkdownText(user.name || user.login);
+  const safeBio = user.bio
+    ? user.bio
+        .split("\n")
+        .map((line) => `> ${escapeMarkdownText(line)}`)
+        .join("\n") + "\n"
+    : "";
+  const safeLocation = user.location ? escapeMarkdownText(user.location) : "";
+  const safeWebsite = user.blog ? getSafeMarkdownUrl(user.blog) : null;
 
-${user.bio ? `> ${user.bio}\n` : ""}
-- 🔭 **Public Repositories:** ${user.public_repos}
+  const markdownContent = `### Hi there, I'm ${displayName}! 👋
+
+${safeBio}- 🔭 **Public Repositories:** ${user.public_repos}
 - ⭐ **Total Stars Earned:** ${stats.totalStars}
 - 🍴 **Total Forks:** ${stats.totalForks}
-- 💻 **Top Language:** ${stats.topLanguage}
-${user.location ? `- 📍 **Location:** ${user.location}\n` : ""}${user.blog ? `- 🌐 **Website:** [${user.blog}](${user.blog.startsWith("http") ? user.blog : `https://${user.blog}`})\n` : ""}
+- 💻 **Top Language:** ${escapeMarkdownText(stats.topLanguage)}
+${safeLocation ? `- 📍 **Location:** ${safeLocation}\n` : ""}${safeWebsite ? `- 🌐 **Website:** [${escapeMarkdownText(user.blog || "")}](${safeWebsite})\n` : ""}
 ---
-*Generated with [GitPulse](https://github.com/${user.login})*`;
+*Generated with [GitPulse](https://github.com/${encodeURIComponent(user.login)})*`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(markdownContent);

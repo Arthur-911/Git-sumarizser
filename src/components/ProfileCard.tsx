@@ -18,11 +18,31 @@ interface ProfileCardProps {
   onOpenShare: () => void;
 }
 
+function getSafeWebUrl(rawUrl: string): string | null {
+  try {
+    const trimmed = rawUrl.trim();
+    if (!trimmed) return null;
+    const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const parsed = new URL(withProtocol);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.href;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function ProfileCard({ user, onOpenShare }: ProfileCardProps) {
   const joinDate = new Date(user.created_at).toLocaleDateString("en-US", {
     month: "short",
     year: "numeric",
   });
+
+  const safeBlogUrl = user.blog ? getSafeWebUrl(user.blog) : null;
+  const cleanTwitter = user.twitter_username
+    ? user.twitter_username.replace(/^@/, "").trim()
+    : null;
 
   return (
     <TiltCard maxTilt={3.5} className="rounded-2xl border border-zinc-800/80 bg-zinc-900/50 p-6 sm:p-8 backdrop-blur-xl shadow-xl shadow-black/20">
@@ -119,29 +139,34 @@ export function ProfileCard({ user, onOpenShare }: ProfileCardProps) {
                 <span className="truncate">{user.location}</span>
               </div>
             )}
-            {user.blog && (
+            {safeBlogUrl ? (
               <div className="flex items-center gap-2 truncate">
                 <Globe className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
                 <a
-                  href={user.blog.startsWith("http") ? user.blog : `https://${user.blog}`}
+                  href={safeBlogUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="truncate text-cyan-400 hover:underline"
                 >
-                  {user.blog.replace(/^https?:\/\//, "")}
+                  {safeBlogUrl.replace(/^https?:\/\//, "")}
                 </a>
               </div>
-            )}
-            {user.twitter_username && (
+            ) : user.blog ? (
+              <div className="flex items-center gap-2 truncate">
+                <Globe className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                <span className="truncate text-zinc-400">{user.blog}</span>
+              </div>
+            ) : null}
+            {cleanTwitter && (
               <div className="flex items-center gap-2 truncate">
                 <TwitterIcon className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
                 <a
-                  href={`https://twitter.com/${user.twitter_username}`}
+                  href={`https://twitter.com/${encodeURIComponent(cleanTwitter)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="truncate text-cyan-400 hover:underline"
                 >
-                  @{user.twitter_username}
+                  @{cleanTwitter}
                 </a>
               </div>
             )}
